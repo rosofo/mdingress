@@ -4,7 +4,7 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src src
 RUN ls
-RUN --mount=type=cache,target=/root/.cargo cargo build --release
+RUN --mount=type=cache,target=/root/.cargo cargo build --release --locked
 
 FROM ubuntu
 

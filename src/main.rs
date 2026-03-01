@@ -15,7 +15,7 @@ use kube::{
     runtime::{WatchStreamExt, events::Event, reflector::Lookup, watcher},
 };
 use tokio::time::sleep;
-use tracing::{debug, info, level_filters::LevelFilter};
+use tracing::{debug, error, info, level_filters::LevelFilter};
 use tracing_subscriber::{EnvFilter, filter::Directive};
 
 use crate::config::Config;
@@ -50,8 +50,27 @@ impl IngressMapper {
         };
         info!("Mapping {} to {}", &host, &self.1);
         let service = mdns::Service::new(&host, &self.1);
-        self.0.insert(host, service);
+        self.0.insert(
+            ingress
+                .metadata
+                .uid
+                .expect("expected a uid for the ingress"),
+            service,
+        );
         Ok(())
+    }
+
+    fn unregister(&mut self, uid: impl AsRef<str>) -> eyre::Result<()> {
+        if let Some(svc) = self.0.remove(uid.as_ref()) {
+            info!("Unregistering service for ingress uid:{}", uid.as_ref());
+            drop(svc);
+            Ok(())
+        } else {
+            Err(eyre!(
+                "No service to unregister for ingress uid:{}",
+                uid.as_ref()
+            ))
+        }
     }
 }
 
@@ -62,15 +81,30 @@ async fn watch_ingresses(
     let mapper = Arc::new(Mutex::new(IngressMapper::new(ip_addr)));
 
     stream
-        .applied_objects()
         .default_backoff()
         .try_for_each(|ing| {
             let mapper = mapper.clone();
             async move {
-                info!("saw {:?}", ing.name());
-                if let Err(err) = mapper.clone().lock().unwrap().register(ing) {
-                    info!("Not mapping ingress: {}", err);
-                };
+                match ing {
+                    watcher::Event::Delete(ing) => {
+                        info!("{:?} deleted, unregistering service...", ing.name());
+                        if let Err(err) = mapper
+                            .clone()
+                            .lock()
+                            .unwrap()
+                            .unregister(ing.uid().expect("expected a uid for the ingress"))
+                        {
+                            error!("Failed to unregister ingress: {}", err);
+                        };
+                    }
+                    watcher::Event::Apply(ing) | watcher::Event::InitApply(ing) => {
+                        info!("{:?} added, checking for `.local` host", ing.name());
+                        if let Err(err) = mapper.clone().lock().unwrap().register(ing) {
+                            info!("Not mapping ingress: {}", err);
+                        };
+                    }
+                    _ => {}
+                }
                 Ok(())
             }
         })

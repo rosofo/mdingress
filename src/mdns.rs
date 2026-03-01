@@ -3,13 +3,14 @@ use std::sync::Arc;
 
 use tokio::process::Command;
 use tokio::sync::Notify;
-use tracing::debug;
+use tracing::{debug, instrument};
 
 pub struct Service {
     notify: Arc<Notify>,
 }
 
 impl Service {
+    #[instrument]
     pub fn new(host: &str, ip: &str) -> Self {
         let notify = Arc::new(Notify::new());
 

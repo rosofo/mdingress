@@ -2,7 +2,7 @@
 pub struct Config {
     #[arg(short, long)]
     ip_address: Option<String>,
-    #[arg(short, long, default_value = "KUBERNETES_SERVICE_HOST")]
+    #[arg(long, default_value = "KUBERNETES_SERVICE_HOST")]
     ip_address_env: String,
 }
 
