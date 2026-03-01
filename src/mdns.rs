@@ -15,7 +15,11 @@ impl Service {
 
         let notify2 = Arc::clone(&notify);
         let mut cmd = Command::new("avahi-publish-address");
-        cmd.args(["-a", host, ip]);
+        cmd.args([
+            "-a",
+            "-R", // Do not add a reverse record (IP -> hostname), so we can have multiple hosts pointing at same IP
+            host, ip,
+        ]);
         let task = tokio::spawn(async move {
             if let Err(err) = register_address(notify2, cmd).await {
                 tracing::error!("Error mapping address: {}", err);

@@ -60,6 +60,7 @@ async fn watch_ingresses(
     ip_addr: String,
 ) -> eyre::Result<()> {
     let mapper = Arc::new(Mutex::new(IngressMapper::new(ip_addr)));
+
     stream
         .applied_objects()
         .default_backoff()
