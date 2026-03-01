@@ -1,9 +1,10 @@
 [package]
 name = "mdingress"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
+clap = { version = "4.5.60", features = ["derive", "env"] }
 eyre = "0.6.12"
 futures = "0.3.32"
 k8s-openapi = { version = "0.27.0", features = ["latest", "schemars"] }

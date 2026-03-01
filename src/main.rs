@@ -1,3 +1,4 @@
+mod config;
 mod mdns;
 use std::{
     collections::HashMap,
@@ -5,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use clap::Parser;
 use eyre::{OptionExt, eyre};
 use futures::{Stream, StreamExt, TryStreamExt};
 use k8s_openapi::api::networking::v1::Ingress;
@@ -15,6 +17,8 @@ use kube::{
 use tokio::time::sleep;
 use tracing::{debug, info, level_filters::LevelFilter};
 use tracing_subscriber::{EnvFilter, filter::Directive};
+
+use crate::config::Config;
 
 struct IngressMapper(HashMap<String, mdns::Service>, String);
 
@@ -53,8 +57,9 @@ impl IngressMapper {
 
 async fn watch_ingresses(
     stream: impl Stream<Item = watcher::Result<watcher::Event<Ingress>>>,
+    ip_addr: String,
 ) -> eyre::Result<()> {
-    let mapper = Arc::new(Mutex::new(IngressMapper::new("192.168.1.111".to_string())));
+    let mapper = Arc::new(Mutex::new(IngressMapper::new(ip_addr)));
     stream
         .applied_objects()
         .default_backoff()
@@ -81,6 +86,10 @@ async fn main() -> eyre::Result<()> {
                 .from_env()?,
         )
         .init();
+
+    let config = Config::parse();
+    let ip_addr = config.ip_address();
+
     let client = Client::try_default().await?;
     debug!(
         "k8s server version: {:?}",
@@ -90,7 +99,7 @@ async fn main() -> eyre::Result<()> {
     let api: Api<Ingress> = Api::all(client);
     let config = watcher::Config::default();
     let ingress_watcher = watcher(api, config);
-    let _task = tokio::spawn(watch_ingresses(ingress_watcher));
+    let _task = tokio::spawn(watch_ingresses(ingress_watcher, ip_addr));
 
     loop {
         sleep(Duration::from_secs(1)).await
