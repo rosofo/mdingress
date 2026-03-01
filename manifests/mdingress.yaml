@@ -1,0 +1,53 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: mdingress
+  namespace: mdingress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mdingress
+  template:
+    metadata:
+      labels:
+        app: mdingress
+    spec:
+      containers:
+        - name: mdingress
+          image: localhost:31400/mdingress:0.2.2
+          command: [mdingress]
+          args:
+            - --ip-address-env
+            - NODE_IP
+          resources:
+            limits:
+              cpu: 250m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 32Mi
+          env:
+            - name: DBUS_SESSION_BUS_ADDRESS
+              value: unix:path=/run/user/1000/bus
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                   fieldPath: status.hostIP
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: dbus
+              mountPath: /run/dbus/system_bus_socket
+              readOnly: false
+            - name: avahi-daemon
+              mountPath: /run/avahi-daemon/socket
+              readOnly: false
+      volumes:
+        - name: dbus
+          hostPath:
+            path: /run/dbus/system_bus_socket
+        - name: avahi-daemon
+          hostPath:
+            path: /run/avahi-daemon/socket
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
